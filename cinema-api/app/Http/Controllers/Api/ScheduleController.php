@@ -221,8 +221,8 @@ class ScheduleController extends Controller
                     'id' => $schedule->theater->id,
                     'name' => $schedule->theater->name,
                 ],
-                'available_seats' => 50, // Default for Flutter
-                'total_seats' => 96, // Default for Flutter
+                'available_seats' => 100, // Default for Flutter
+                'total_seats' => 100, // Default for Flutter
             ];
         });
 
