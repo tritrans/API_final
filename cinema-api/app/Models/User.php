@@ -28,6 +28,8 @@ use OpenApi\Attributes as OA;
 class User extends Authenticatable implements JWTSubject
 {
     use HasFactory, Notifiable, HasRoles;
+    
+    protected $guard_name = 'api';
 
     /**
      * The attributes that are mass assignable.

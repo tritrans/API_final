@@ -40,7 +40,6 @@ class CommentController extends Controller
                 'data' => $comments
             ]);
         } catch (\Exception $e) {
-            \Log::error('Error in getAllComments: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Error fetching comments',
@@ -67,31 +66,27 @@ class CommentController extends Controller
                     'id' => $comment->id,
                     'movie_id' => $comment->movie_id,
                     'user_id' => $comment->user_id,
+                    'user_name' => $comment->user->name ?? 'Người dùng ẩn danh',
+                    'user_email' => $comment->user->email ?? null,
+                    'user_avatar_url' => $comment->user->avatar ?? null,
                     'parent_id' => $comment->parent_id,
                     'content' => $comment->content,
                     'is_hidden' => $comment->is_hidden,
                     'hidden_reason' => $comment->hidden_reason,
                     'hidden_at' => $comment->hidden_at,
-                    'user' => [
-                        'name' => $comment->user->name,
-                        'email' => $comment->user->email,
-                        'avatar' => $comment->user->avatar,
-                    ],
                     'replies' => $comment->replies->map(function ($reply) {
                         return [
                             'id' => $reply->id,
                             'movie_id' => $reply->movie_id,
                             'user_id' => $reply->user_id,
+                            'user_name' => $reply->user->name ?? 'Người dùng ẩn danh',
+                            'user_email' => $reply->user->email ?? null,
+                            'user_avatar_url' => $reply->user->avatar ?? null,
                             'parent_id' => $reply->parent_id,
                             'content' => $reply->content,
                             'is_hidden' => $reply->is_hidden,
                             'hidden_reason' => $reply->hidden_reason,
                             'hidden_at' => $reply->hidden_at,
-                            'user' => [
-                                'name' => $reply->user->name,
-                                'email' => $reply->user->email,
-                                'avatar' => $reply->user->avatar,
-                            ],
                             'created_at' => $reply->created_at->toISOString(),
                             'updated_at' => $reply->updated_at->toISOString(),
                         ];
@@ -126,6 +121,11 @@ class CommentController extends Controller
 
     /**
      * Store a newly created comment
+     * Tạo bình luận mới cho phim
+     * 
+     * @param Request $request - Dữ liệu request chứa content và parent_id
+     * @param int $movieId - ID của phim
+     * @return \Illuminate\Http\JsonResponse
      */
     public function store(Request $request, $movieId)
     {
@@ -171,6 +171,11 @@ class CommentController extends Controller
 
     /**
      * Create a reply to a comment (for admin)
+     * Tạo reply cho bình luận (dành cho admin)
+     * 
+     * @param Request $request - Dữ liệu request chứa content
+     * @param int $commentId - ID của bình luận gốc
+     * @return \Illuminate\Http\JsonResponse
      */
     public function createReply(Request $request, $commentId)
     {
@@ -213,13 +218,30 @@ class CommentController extends Controller
                 'parent_id' => $commentId,
             ]);
 
+            // Load user relationship
+            $reply->load('user');
+
+            // Format response similar to getMovieComments
+            $formattedReply = [
+                'id' => $reply->id,
+                'movie_id' => $reply->movie_id,
+                'user_id' => $reply->user_id,
+                'user_name' => $reply->user->name ?? 'Người dùng ẩn danh',
+                'user_email' => $reply->user->email ?? null,
+                'user_avatar_url' => $reply->user->avatar ?? null,
+                'content' => $reply->content,
+                'parent_id' => $reply->parent_id,
+                'is_hidden' => $reply->is_hidden ?? false,
+                'created_at' => $reply->created_at->toISOString(),
+                'updated_at' => $reply->updated_at->toISOString(),
+            ];
+
             return response()->json([
                 'success' => true,
                 'message' => 'Reply created successfully',
-                'data' => $reply
+                'data' => $formattedReply
             ], 201);
         } catch (\Exception $e) {
-            \Log::error('Error creating reply: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Error creating reply',
@@ -305,7 +327,6 @@ class CommentController extends Controller
                 ]
             ]);
         } catch (\Exception $e) {
-            \Log::error('Error fetching comment: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Error fetching comment'

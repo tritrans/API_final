@@ -159,6 +159,12 @@ class AuthController extends Controller
 
         $user = Auth::guard('api')->user();
         
+        // Check if user is active
+        if (!$user->is_active) {
+            Auth::guard('api')->logout();
+            return $this->errorResponse(ErrorCode::FORBIDDEN, null, 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.');
+        }
+        
         // Load roles and format user data
         $user->load('roles');
         
@@ -169,6 +175,7 @@ class AuthController extends Controller
             'avatar' => $user->avatar,
             'role' => $user->roles->first()?->name ?? 'user',
             'roles' => $user->roles->pluck('name')->toArray(),
+            'is_active' => $user->is_active,
             'created_at' => $user->created_at,
             'updated_at' => $user->updated_at,
         ];
@@ -299,11 +306,35 @@ class AuthController extends Controller
             'avatar' => $user->avatar,
             'role' => $user->roles->first()?->name ?? 'user',
             'roles' => $user->roles->pluck('name')->toArray(),
+            'is_active' => $user->is_active,
             'created_at' => $user->created_at,
             'updated_at' => $user->updated_at,
         ];
         
         return $this->successResponse($userData, 'User information retrieved successfully');
+    }
+
+    /**
+     * Toggle user active status (Admin only)
+     */
+    public function toggleUserStatus(Request $request, $userId)
+    {
+        $user = User::find($userId);
+        
+        if (!$user) {
+            return $this->errorResponse(ErrorCode::USER_NOT_FOUND, null, 'Không tìm thấy người dùng');
+        }
+
+        $user->is_active = !$user->is_active;
+        $user->save();
+
+        $status = $user->is_active ? 'mở khóa' : 'khóa';
+        
+        return $this->successResponse([
+            'user_id' => $user->id,
+            'is_active' => $user->is_active,
+            'status' => $status
+        ], "Tài khoản đã được {$status} thành công");
     }
 
     #[OA\Post(

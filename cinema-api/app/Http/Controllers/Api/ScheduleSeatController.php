@@ -37,4 +37,3 @@ class ScheduleSeatController extends Controller
     // Only use lockSeats -> createBooking flow in BookingController
 }
 
-

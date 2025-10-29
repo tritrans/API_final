@@ -36,6 +36,21 @@ class GoogleDriveService
     }
 
     /**
+     * Test configuration
+     */
+    public function testConfig(): array
+    {
+        return [
+            'client_id' => config('services.google.client_id'),
+            'client_secret' => config('services.google.client_secret') ? 'Set' : 'Not set',
+            'refresh_token' => config('services.google.refresh_token') ? 'Set' : 'Not set',
+            'folder_id' => config('services.google.folder_id'),
+            'service_account_path' => config('services.google.service_account_path'),
+            'has_service_account_file' => file_exists(storage_path('app/google-drive-key.json'))
+        ];
+    }
+
+    /**
      * Test authentication
      */
     public function testAuth(): array
@@ -75,13 +90,6 @@ class GoogleDriveService
     public function uploadFile(UploadedFile $file, string $folder = 'movies'): ?string
     {
         try {
-            \Log::info('Starting Google Drive upload', [
-                'file_name' => $file->getClientOriginalName(),
-                'file_size' => $file->getSize(),
-                'mime_type' => $file->getMimeType(),
-                'folder_id' => $this->folderId
-            ]);
-
             // Ensure we have a valid access token
             $this->ensureValidAccessToken();
 
@@ -91,36 +99,22 @@ class GoogleDriveService
                 'name' => $fileName,
                 'parents' => [$this->folderId],
             ]);
-
-            \Log::info('File metadata created', [
-                'name' => $fileName,
-                'parents' => [$this->folderId]
-            ]);
-
+            
             // Upload file
             $content = file_get_contents($file->getRealPath());
-            \Log::info('File content read', ['content_size' => strlen($content)]);
-            
             $uploadedFile = $this->service->files->create($fileMetadata, [
                 'data' => $content,
                 'mimeType' => $file->getMimeType(),
                 'uploadType' => 'multipart',
                 'fields' => 'id,webViewLink,webContentLink'
             ]);
-
-            \Log::info('File uploaded to Google Drive', [
-                'file_id' => $uploadedFile->getId(),
-                'web_view_link' => $uploadedFile->getWebViewLink(),
-                'web_content_link' => $uploadedFile->getWebContentLink()
-            ]);
-
+            
             // Make file publicly accessible
             $this->makeFilePublic($uploadedFile->getId());
 
             // Return thumbnail URL for images
             if (str_starts_with($file->getMimeType(), 'image/')) {
                 $thumbnailUrl = $this->getThumbnailUrl($uploadedFile->getId());
-                \Log::info('Image uploaded, returning thumbnail URL: ' . $thumbnailUrl);
                 return $thumbnailUrl;
             }
             
@@ -128,12 +122,17 @@ class GoogleDriveService
             return $this->getPublicUrl($uploadedFile->getId());
 
         } catch (\Exception $e) {
-            \Log::error('Google Drive upload error: ' . $e->getMessage(), [
+            \Log::error('Google Drive upload failed: ' . $e->getMessage());
+            \Log::error('Google Drive upload error details: ' . json_encode([
                 'file_name' => $file->getClientOriginalName(),
                 'file_size' => $file->getSize(),
-                'mime_type' => $file->getMimeType(),
-                'error_trace' => $e->getTraceAsString()
-            ]);
+                'file_type' => $file->getMimeType(),
+                'folder_id' => $this->folderId,
+                'client_id' => config('services.google.client_id'),
+                'has_refresh_token' => !empty(config('services.google.refresh_token')),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]));
             return null;
         }
     }
@@ -164,9 +163,7 @@ class GoogleDriveService
             // Return public URL
             return $this->getPublicUrl($uploadedFile->getId());
 
-        } catch (\Exception $e) {
-            \Log::error('Google Drive upload error: ' . $e->getMessage());
-            return null;
+        } catch (\Exception $e) {return null;
         }
     }
 
@@ -197,9 +194,7 @@ class GoogleDriveService
         try {
             $this->service->files->delete($fileId);
             return true;
-        } catch (\Exception $e) {
-            \Log::error('Google Drive delete error: ' . $e->getMessage());
-            return false;
+        } catch (\Exception $e) {return false;
         }
     }
 
@@ -227,9 +222,7 @@ class GoogleDriveService
             ]);
 
             $this->service->permissions->create($fileId, $permission);
-        } catch (\Exception $e) {
-            \Log::error('Error making file public: ' . $e->getMessage());
-        }
+        } catch (\Exception $e) {}
     }
 
     /**
@@ -247,41 +240,22 @@ class GoogleDriveService
     private function ensureValidAccessToken(): void
     {
         try {
-            \Log::info('Checking Google Drive authentication', [
-                'client_id' => config('services.google.client_id'),
-                'client_secret' => config('services.google.client_secret') ? 'SET' : 'NOT_SET',
-                'refresh_token' => config('services.google.refresh_token') ? 'SET' : 'NOT_SET',
-                'folder_id' => config('services.google.folder_id')
-            ]);
-
             // Check if we have an access token
             $accessToken = $this->client->getAccessToken();
-            \Log::info('Current access token status', ['has_token' => !empty($accessToken)]);
             
             if (!$accessToken) {
                 // Try to refresh the token
                 $refreshToken = config('services.google.refresh_token');
-                \Log::info('Attempting to refresh token', ['has_refresh_token' => !empty($refreshToken)]);
-                
                 if ($refreshToken) {
                     $this->client->refreshToken($refreshToken);
                     $accessToken = $this->client->getAccessToken();
-                    \Log::info('Token refresh result', ['success' => !empty($accessToken)]);
                 }
             }
             
             if (!$accessToken) {
                 throw new \Exception('No valid access token available');
             }
-            
-            \Log::info('Authentication successful', [
-                'token_expires_in' => $accessToken['expires_in'] ?? 'unknown'
-            ]);
-            
         } catch (\Exception $e) {
-            \Log::error('Google Drive auth error: ' . $e->getMessage(), [
-                'error_trace' => $e->getTraceAsString()
-            ]);
             throw new \Exception('Failed to authenticate with Google Drive: ' . $e->getMessage());
         }
     }

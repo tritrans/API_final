@@ -278,11 +278,7 @@ class MovieController extends Controller
 
         // Auto-generate schedules for the movie
         $scheduleService = new ScheduleGenerationService();
-        $schedules = $scheduleService->generateSchedulesForMovie($movie);
-        
-        \Log::info('Generated ' . count($schedules) . ' schedules for new movie: ' . $movie->title);
-
-        return response()->json([
+        $schedules = $scheduleService->generateSchedulesForMovie($movie);return response()->json([
             'success' => true,
             'message' => 'Movie created successfully',
             'data' => $movie->load(['genres'])

@@ -46,11 +46,7 @@ class UserController extends Controller
                 'success' => true,
                 'data' => $users
             ]);
-        } catch (\Exception $e) {
-            \Log::error('Error in getAllUsersForAdmin: ' . $e->getMessage());
-            \Log::error('Stack trace: ' . $e->getTraceAsString());
-            
-            return response()->json([
+        } catch (\Exception $e) {return response()->json([
                 'success' => false,
                 'message' => 'Error retrieving users: ' . $e->getMessage(),
                 'error' => $e->getMessage()
@@ -421,15 +417,7 @@ class UserController extends Controller
             return $this->errorResponse(ErrorCode::FORBIDDEN, null, 'Cannot delete your own account');
         }
 
-        // Log the deletion
-        \Log::info('User deleted successfully', [
-            'deleted_by' => auth()->user()->id,
-            'deleted_user_id' => $id,
-            'deleted_user_name' => $targetUser->name,
-            'deleted_user_email' => $targetUser->email
-        ]);
-
-        $targetUser->delete();
+        // Log the deletion$targetUser->delete();
 
         return $this->successResponse(null, 'User deleted successfully');
     }
@@ -610,15 +598,6 @@ class UserController extends Controller
             // Assign role using Spatie
             $user->syncRoles([$role]);
             
-            // Log the update
-            \Log::info('Role assigned successfully', [
-                'user_id' => $user->id,
-                'user_name' => $user->name,
-                'old_role_id' => $user->getOriginal('role_id'),
-                'new_role_id' => $roleId,
-                'role_name' => $role
-            ]);
-
             return response()->json([
                 'success' => true,
                 'message' => 'Role assigned successfully',
@@ -629,9 +608,7 @@ class UserController extends Controller
                     'role' => $role
                 ]
             ]);
-        } catch (\Exception $e) {
-            \Log::error('Error assigning role: ' . $e->getMessage());
-            return response()->json([
+        } catch (\Exception $e) {return response()->json([
                 'success' => false,
                 'message' => 'Error assigning role: ' . $e->getMessage()
             ], 500);
@@ -650,15 +627,6 @@ class UserController extends Controller
             $user->update(['role_id' => 1]);
             $user->syncRoles(['user']);
             
-            // Log the update
-            \Log::info('Admin role revoked successfully', [
-                'user_id' => $user->id,
-                'user_name' => $user->name,
-                'old_role_id' => $user->getOriginal('role_id'),
-                'new_role_id' => 1,
-                'role_name' => 'user'
-            ]);
-
             return response()->json([
                 'success' => true,
                 'message' => 'Admin role revoked successfully',
@@ -669,9 +637,7 @@ class UserController extends Controller
                     'role' => 'user'
                 ]
             ]);
-        } catch (\Exception $e) {
-            \Log::error('Error revoking admin role: ' . $e->getMessage());
-            return response()->json([
+        } catch (\Exception $e) {return response()->json([
                 'success' => false,
                 'message' => 'Error revoking admin role: ' . $e->getMessage()
             ], 500);
@@ -690,14 +656,6 @@ class UserController extends Controller
             // Update user status
             $user->update(['is_active' => $activate]);
             
-            // Log the update
-            \Log::info('User status toggled successfully', [
-                'user_id' => $user->id,
-                'user_name' => $user->name,
-                'old_status' => $user->getOriginal('is_active'),
-                'new_status' => $activate
-            ]);
-
             return response()->json([
                 'success' => true,
                 'message' => $activate ? 'User activated successfully' : 'User deactivated successfully',
@@ -708,9 +666,7 @@ class UserController extends Controller
                     'is_active' => $activate
                 ]
             ]);
-        } catch (\Exception $e) {
-            \Log::error('Error toggling user status: ' . $e->getMessage());
-            return response()->json([
+        } catch (\Exception $e) {return response()->json([
                 'success' => false,
                 'message' => 'Error toggling user status: ' . $e->getMessage()
             ], 500);
@@ -766,9 +722,7 @@ class UserController extends Controller
                 ->header('Content-Type', 'text/csv; charset=UTF-8')
                 ->header('Content-Disposition', 'attachment; filename="danh_sach_nguoi_dung_' . date('Y-m-d') . '.csv"');
                 
-        } catch (\Exception $e) {
-            \Log::error('Export users error: ' . $e->getMessage());
-            return response()->json([
+        } catch (\Exception $e) {return response()->json([
                 'success' => false,
                 'message' => 'Có lỗi xảy ra khi xuất dữ liệu: ' . $e->getMessage()
             ], 500);

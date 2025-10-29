@@ -28,4 +28,3 @@ class Person extends Model
     }
 }
 
-

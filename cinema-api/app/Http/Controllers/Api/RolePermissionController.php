@@ -322,16 +322,7 @@ class RolePermissionController extends Controller
     )]
     public function assignRoles(Request $request, $id)
     {
-        // Debug: Log the request
-        \Log::info('RolePermissionController::assignRoles called', [
-            'user_id' => auth()->id(),
-            'target_user_id' => $id,
-            'request_data' => $request->all(),
-            'user_role' => auth()->user()?->role,
-            'user_permissions' => auth()->user()?->getAllPermissions()->pluck('name')->toArray()
-        ]);
-
-        // Simple permission check - allow super_admin and admin
+        // Debug: Log the request// Simple permission check - allow super_admin and admin
         $currentUser = auth()->user();
         if ($currentUser->role !== 'super_admin' && $currentUser->role !== 'admin') {
             return $this->errorResponse(ErrorCode::FORBIDDEN, null, 'Insufficient permissions to assign roles');

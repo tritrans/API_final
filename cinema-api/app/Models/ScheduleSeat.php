@@ -31,4 +31,3 @@ class ScheduleSeat extends Model
     }
 }
 
-

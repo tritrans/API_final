@@ -20,6 +20,7 @@ class Review extends Model
         'hidden_reason',
         'hidden_by',
         'hidden_at',
+        'parent_review_id',
     ];
 
     protected $casts = [
@@ -40,7 +41,12 @@ class Review extends Model
 
     public function replies(): HasMany
     {
-        return $this->hasMany(Comment::class, 'parent_id');
+        return $this->hasMany(Review::class, 'parent_review_id');
+    }
+
+    public function parentReview(): BelongsTo
+    {
+        return $this->belongsTo(Review::class, 'parent_review_id');
     }
 
     // Auto-update movie rating when review changes

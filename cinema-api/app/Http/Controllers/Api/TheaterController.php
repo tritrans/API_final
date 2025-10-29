@@ -152,9 +152,7 @@ class TheaterController extends Controller
 
             return $this->successResponse($theaterData, 'Theater retrieved successfully');
             
-        } catch (\Exception $e) {
-            \Log::error('Theater show error: ' . $e->getMessage());
-            return $this->errorResponse(ErrorCode::INTERNAL_ERROR, null, 'Failed to retrieve theater');
+        } catch (\Exception $e) {return $this->errorResponse(ErrorCode::INTERNAL_ERROR, null, 'Failed to retrieve theater');
         }
     }
 

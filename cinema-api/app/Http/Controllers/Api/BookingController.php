@@ -50,7 +50,6 @@ class BookingController extends Controller
                     $seatNum = (int) substr($seatNumber, 1);
 
                     // Debug: Log seat lookup
-                    error_log("DEBUG: Looking for seat {$seatNumber} (row: {$rowLabel}, num: {$seatNum}) in theater {$schedule->theater_id}");
 
                     // Find seat in database
                     $seat = Seat::where('theater_id', $schedule->theater_id)
@@ -59,11 +58,9 @@ class BookingController extends Controller
                         ->first();
 
                     if (!$seat) {
-                        error_log("ERROR: Seat {$seatNumber} not found in theater {$schedule->theater_id}");
                         throw new \Exception("Seat {$seatNumber} not found");
                     }
 
-                    error_log("DEBUG: Found seat {$seatNumber} with ID {$seat->id}");
 
                     // Check if seat is available or can be locked
                     $scheduleSeat = ScheduleSeat::firstOrNew([
@@ -71,16 +68,13 @@ class BookingController extends Controller
                         'seat_id' => $seat->id,
                     ]);
 
-                    error_log("DEBUG: ScheduleSeat for {$seatNumber}: exists={$scheduleSeat->exists}, status={$scheduleSeat->status}, locked_until=" . ($scheduleSeat->locked_until ? $scheduleSeat->locked_until : 'null'));
 
                     if ($scheduleSeat->exists && $scheduleSeat->status === 'sold') {
-                        error_log("ERROR: Seat {$seatNumber} is already sold");
                         throw new \Exception("Seat {$seatNumber} is already sold");
                     }
 
                     if ($scheduleSeat->exists && $scheduleSeat->status === 'reserved' && 
                         $scheduleSeat->locked_until && $scheduleSeat->locked_until->isFuture()) {
-                        error_log("ERROR: Seat {$seatNumber} is already reserved until {$scheduleSeat->locked_until}");
                         throw new \Exception("Seat {$seatNumber} is already reserved");
                     }
 
@@ -186,10 +180,6 @@ class BookingController extends Controller
                 ], 401);
             }
 
-            // Debug: Log request data
-            error_log('Booking request data: ' . json_encode($request->all()));
-            error_log('Showtime ID: ' . $request->showtime_id);
-            error_log('Seat IDs: ' . json_encode($request->seat_ids));
 
             DB::beginTransaction();
 
@@ -200,7 +190,6 @@ class BookingController extends Controller
                     if (is_numeric($seatIdValue)) {
                         // Web format: direct seat ID (integer)
                         $actualSeatIds[] = (int) $seatIdValue;
-                        error_log("Using direct seat ID: {$seatIdValue}");
                     } else {
                         // Flutter format: string format (e.g., "3_3" -> row 3, seat 3)
                         $parts = explode('_', $seatIdValue);
@@ -227,7 +216,6 @@ class BookingController extends Controller
                         }
                         
                         $actualSeatIds[] = $seat->id;
-                        error_log("Converted seat {$seatIdValue} to actual seat ID: {$seat->id}");
                     }
                 }
 
@@ -327,7 +315,6 @@ class BookingController extends Controller
                     Mail::to($user->email)->send(new BookingConfirmationMail($user, $booking, $qrCodeBase64));
                 } catch (\Exception $e) {
                     // Log email error but don't fail the booking
-                    \Log::error('Failed to send booking confirmation email: ' . $e->getMessage());
                 }
 
                 return response()->json([
@@ -545,8 +532,6 @@ class BookingController extends Controller
                         $rowLabel = substr($bookingSeat->seat_number, 0, 1);
                         $seatNumber = substr($bookingSeat->seat_number, 1);
                         
-                        \Log::info("Cancelling seat: {$bookingSeat->seat_number}, Row: $rowLabel, Number: $seatNumber, Schedule: {$booking->showtime_id}");
-                        
                         $scheduleSeat = \App\Models\ScheduleSeat::where('schedule_id', $booking->showtime_id)
                             ->whereHas('seat', function($query) use ($rowLabel, $seatNumber, $booking) {
                                 $query->where('row_label', $rowLabel)
@@ -555,8 +540,6 @@ class BookingController extends Controller
                             })
                             ->first();
                             
-                        \Log::info("Found schedule seat: " . ($scheduleSeat ? $scheduleSeat->id : 'null'));
-
                         if ($scheduleSeat) {
                             $scheduleSeat->update([
                                 'status' => 'available',

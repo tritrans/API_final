@@ -42,9 +42,7 @@ class StatisticsController extends Controller
                 'featured' => $featuredMovies,
                 'this_month' => $thisMonthMovies
             ]);
-        } catch (\Exception $e) {
-            \Log::error('Movies stats error: ' . $e->getMessage());
-            return $this->successResponse([
+        } catch (\Exception $e) {return $this->successResponse([
                 'total' => 0,
                 'featured' => 0,
                 'this_month' => 0
@@ -122,9 +120,7 @@ class StatisticsController extends Controller
                 'revenue' => $thisMonthRevenue,
                 'today' => $todayBookings
             ]);
-        } catch (\Exception $e) {
-            \Log::error('Bookings stats error: ' . $e->getMessage());
-            return $this->successResponse([
+        } catch (\Exception $e) {return $this->successResponse([
                 'total' => 0,
                 'revenue' => 0,
                 'today' => 0
@@ -194,9 +190,7 @@ class StatisticsController extends Controller
             }
 
             return $this->successResponse($monthlyRevenue);
-        } catch (\Exception $e) {
-            \Log::error('Monthly revenue error: ' . $e->getMessage());
-            return $this->successResponse([]);
+        } catch (\Exception $e) {return $this->successResponse([]);
         }
     }
 }

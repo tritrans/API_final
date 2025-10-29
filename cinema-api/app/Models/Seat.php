@@ -21,4 +21,3 @@ class Seat extends Model
     }
 }
 
-

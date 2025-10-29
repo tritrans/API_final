@@ -72,17 +72,10 @@ class MovieCastController extends Controller
         }
 
         try {
-            Log::info("Starting cast update for movie {$movie->id}");
-            Log::info("Request data: " . json_encode($request->all()));
-            
             // Handle cast - create new actors if they don't exist
             if ($request->has('cast') && is_array($request->cast)) {
-                Log::info("Processing cast array with " . count($request->cast) . " actors");
-                
                 // Detach existing actors first to avoid duplicates
                 $detachedCount = $movie->movieCasts()->where('role', 'actor')->detach();
-                Log::info("Detached {$detachedCount} existing actors for movie {$movie->id}");
-                
                 $actorsToAttach = [];
                 foreach ($request->cast as $index => $actorName) {
                     if (empty($actorName)) continue;
@@ -97,13 +90,9 @@ class MovieCastController extends Controller
                         'billing_order' => $index + 1,
                         'role' => 'actor'
                     ];
-                    
-                    Log::info("Prepared actor: {$person->name} (ID: {$person->id}) for movie {$movie->id}");
                 }
                 
                 if (!empty($actorsToAttach)) {
-                    Log::info("Inserting " . count($actorsToAttach) . " actors to movie {$movie->id}");
-                    
                     // Delete existing actors first
                     DB::table('movie_people')
                         ->where('movie_id', $movie->id)
@@ -126,37 +115,30 @@ class MovieCastController extends Controller
                     
                     if (!empty($insertData)) {
                         $result = DB::table('movie_people')->insert($insertData);
-                        Log::info("Inserted " . count($insertData) . " actors, result: " . ($result ? 'SUCCESS' : 'FAILED'));
                         
                         // Verify insertion
                         $verifyCount = DB::table('movie_people')
                             ->where('movie_id', $movie->id)
                             ->where('role', 'actor')
                             ->count();
-                        Log::info("Verification: Found {$verifyCount} actors in database after insertion");
                     }
                 }
             } else {
-                Log::info("No cast array provided or cast is not an array");
+                // No cast data provided
             }
 
             // Handle director - create if doesn't exist
             if ($request->has('director') && !empty($request->director)) {
-                Log::info("Processing director: {$request->director}");
-                
                 // Delete existing directors first
                 $deletedCount = DB::table('movie_people')
                     ->where('movie_id', $movie->id)
                     ->where('role', 'director')
                     ->delete();
-                Log::info("Deleted {$deletedCount} existing directors from database");
-                
+                    
                 $director = Person::firstOrCreate(
                     ['name' => $request->director],
                     ['name' => $request->director]
                 );
-                
-                Log::info("Inserting director: {$director->name} (ID: {$director->id}) to movie {$movie->id}");
                 
                 // Insert director directly
                 DB::table('movie_people')->insert([
@@ -168,14 +150,10 @@ class MovieCastController extends Controller
                     'created_at' => now(),
                     'updated_at' => now()
                 ]);
-                
-                Log::info("Director inserted successfully");
             } else {
-                Log::info("No director provided");
+                // No cast data provided
             }
             
-            Log::info("Cast update completed for movie {$movie->id}");
-
             return response()->json([
                 'success' => true,
                 'message' => 'Cast updated successfully',
@@ -192,7 +170,6 @@ class MovieCastController extends Controller
                     'database_check' => DB::table('movie_people')->where('movie_id', 15)->get()->toArray()
                 ]
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

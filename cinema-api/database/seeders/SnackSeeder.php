@@ -14,57 +14,56 @@ class SnackSeeder extends Seeder
     {
         $snacks = [
             [
-                'name' => 'Popcorn Large',
-                'name_vi' => 'Bắp rang bơ lớn',
-                'description' => 'Bắp rang bơ thơm ngon, size lớn',
-                'price' => 45000,
-                'image' => 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400',
+                'name' => 'Combo 1 - Popcorn + Drink',
+                'name_vi' => 'Combo 1 - Bắp + Nước',
+                'description' => 'Medium popcorn + Medium drink',
+                'description_vi' => 'Bắp rang bơ vừa + Nước ngọt vừa',
+                'price' => 55000,
+                'image' => 'Snack/Combo.jpg',
+                'category' => 'combo',
                 'available' => true,
-            ],
-            [
-                'name' => 'Popcorn Medium',
-                'name_vi' => 'Bắp rang bơ vừa',
-                'description' => 'Bắp rang bơ thơm ngon, size vừa',
-                'price' => 35000,
-                'image' => 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400',
-                'available' => true,
+                'stock' => 100
             ],
             [
                 'name' => 'Coca Cola',
                 'name_vi' => 'Coca Cola',
-                'description' => 'Nước ngọt Coca Cola mát lạnh',
-                'price' => 25000,
-                'image' => 'https://images.unsplash.com/photo-1581636625402-29b2a704ef13?w=400',
+                'description' => 'Large Coca Cola',
+                'description_vi' => 'Coca Cola lớn',
+                'price' => 35000,
+                'image' => 'Snack/coca.jpg',
+                'category' => 'drink',
                 'available' => true,
+                'stock' => 200
             ],
             [
-                'name' => 'Pepsi',
-                'name_vi' => 'Pepsi',
-                'description' => 'Nước ngọt Pepsi mát lạnh',
-                'price' => 25000,
-                'image' => 'https://images.unsplash.com/photo-1581636625402-29b2a704ef13?w=400',
+                'name' => 'Mineral Water',
+                'name_vi' => 'Nước suối',
+                'description' => 'Pure mineral water',
+                'description_vi' => 'Nước suối tinh khiết',
+                'price' => 15000,
+                'image' => 'Snack/MineralWater.jpg',
+                'category' => 'drink',
                 'available' => true,
+                'stock' => 150
             ],
             [
-                'name' => 'Hot Dog',
-                'name_vi' => 'Xúc xích nóng',
-                'description' => 'Xúc xích nóng với bánh mì',
-                'price' => 55000,
-                'image' => 'https://images.unsplash.com/photo-1551218808-94e220e084d2?w=400',
+                'name' => 'Popcorn',
+                'name_vi' => 'Bắp rang bơ',
+                'description' => 'Large buttered popcorn',
+                'description_vi' => 'Bắp rang bơ lớn',
+                'price' => 45000,
+                'image' => 'Snack/Popcorn.jpg',
+                'category' => 'food',
                 'available' => true,
-            ],
-            [
-                'name' => 'Nachos',
-                'name_vi' => 'Nachos phô mai',
-                'description' => 'Nachos giòn với phô mai nóng chảy',
-                'price' => 65000,
-                'image' => 'https://images.unsplash.com/photo-1513456852971-30c0b8199d4d?w=400',
-                'available' => true,
-            ],
+                'stock' => 80
+            ]
         ];
 
-        foreach ($snacks as $snackData) {
-            Snack::create($snackData);
+        foreach ($snacks as $snack) {
+            Snack::updateOrCreate(
+                ['name' => $snack['name']],
+                $snack
+            );
         }
     }
 }

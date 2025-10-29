@@ -17,18 +17,11 @@ class ScheduleGenerationService
      * Generate schedules for a movie
      */
     public function generateSchedulesForMovie(Movie $movie): array
-    {
-        Log::info('Generating schedules for movie: ' . $movie->id . ' - ' . $movie->title);
-        
-        $generatedSchedules = [];
+    {$generatedSchedules = [];
         
         try {
             // Get all active theaters
-            $theaters = Theater::where('is_active', true)->get();
-            
-            Log::info('Found ' . $theaters->count() . ' active theaters');
-            
-            if ($theaters->isEmpty()) {
+            $theaters = Theater::where('is_active', true)->get();if ($theaters->isEmpty()) {
                 Log::warning('No active theaters found');
                 return $generatedSchedules;
             }
@@ -37,21 +30,14 @@ class ScheduleGenerationService
             $releaseDate = Carbon::parse($movie->release_date);
             $endDate = $releaseDate->copy()->addDays(30); // Generate for 30 days
             
-            Log::info('Release date: ' . $releaseDate->format('Y-m-d'));
-            Log::info('End date: ' . $endDate->format('Y-m-d'));
-
             foreach ($theaters as $theater) {
-                Log::info('Processing theater: ' . $theater->id . ' - ' . $theater->name);
-                
                 $theaterSchedules = $this->generateSchedulesForTheater($movie, $theater, $releaseDate, $endDate);
                 $generatedSchedules = array_merge($generatedSchedules, $theaterSchedules);
             }
-
-            Log::info('Total schedules generated: ' . count($generatedSchedules));
+            
             return $generatedSchedules;
 
         } catch (\Exception $e) {
-            Log::error('Error generating schedules for movie ' . $movie->id . ': ' . $e->getMessage());
             throw $e;
         }
     }
@@ -64,10 +50,7 @@ class ScheduleGenerationService
         $schedules = [];
         $currentDate = $releaseDate->copy();
         
-        while ($currentDate->lte($endDate)) {
-            Log::info('Processing date: ' . $currentDate->format('Y-m-d'));
-            
-            // Get schedule times for this date
+        while ($currentDate->lte($endDate)) {// Get schedule times for this date
             $scheduleTimes = $this->getScheduleTimes($currentDate);
             
             foreach ($scheduleTimes as $index => $time) {
@@ -119,14 +102,8 @@ class ScheduleGenerationService
                 ->setMinute($time['minute'])
                 ->setSecond(0);
             
-            $endTime = $startTime->copy()->addMinutes($movie->duration ?? 120);
-            
-            Log::info('Creating schedule: ' . $startTime->format('Y-m-d H:i:s') . ' - ' . $endTime->format('Y-m-d H:i:s'));
-            
-            // Skip if the schedule is in the past
-            if ($startTime->isPast()) {
-                Log::info('Skipping past schedule');
-                return null;
+            $endTime = $startTime->copy()->addMinutes($movie->duration ?? 120);// Skip if the schedule is in the past
+            if ($startTime->isPast()) {return null;
             }
 
             // Check if schedule already exists
@@ -135,9 +112,7 @@ class ScheduleGenerationService
                 ->where('start_time', $startTime)
                 ->first();
 
-            if ($existingSchedule) {
-                Log::info('Schedule already exists, skipping');
-                return $existingSchedule;
+            if ($existingSchedule) {return $existingSchedule;
             }
 
             // Create new schedule
@@ -152,14 +127,9 @@ class ScheduleGenerationService
             ]);
 
             // Initialize seats for this schedule
-            $this->initializeScheduleSeats($schedule, $theater);
+            $this->initializeScheduleSeats($schedule, $theater);return $schedule;
 
-            Log::info('Schedule created successfully with ID: ' . $schedule->id);
-            return $schedule;
-
-        } catch (\Exception $e) {
-            Log::error('Error creating schedule: ' . $e->getMessage());
-            return null;
+        } catch (\Exception $e) {return null;
         }
     }
 
@@ -170,11 +140,7 @@ class ScheduleGenerationService
     {
         try {
             // Get all seats for this theater
-            $seats = Seat::where('theater_id', $theater->id)->get();
-            
-            Log::info('Initializing ' . $seats->count() . ' seats for schedule ' . $schedule->id);
-            
-            foreach ($seats as $seat) {
+            $seats = Seat::where('theater_id', $theater->id)->get();foreach ($seats as $seat) {
                 ScheduleSeat::create([
                     'schedule_id' => $schedule->id,
                     'seat_id' => $seat->id,
@@ -200,13 +166,7 @@ class ScheduleGenerationService
                     'available_seats' => $seats->count(),
                     'seats' => $availableSeats
                 ])
-            ]);
-            
-            Log::info('Seats initialized successfully for schedule ' . $schedule->id);
-            
-        } catch (\Exception $e) {
-            Log::error('Error initializing seats for schedule ' . $schedule->id . ': ' . $e->getMessage());
-        }
+            ]);} catch (\Exception $e) {}
     }
 
     /**
@@ -243,20 +203,12 @@ class ScheduleGenerationService
      * Regenerate schedules for a movie (delete existing and create new)
      */
     public function regenerateSchedulesForMovie(Movie $movie): array
-    {
-        Log::info('Regenerating schedules for movie: ' . $movie->id);
-        
-        try {
+    {try {
             // Delete existing schedules
-            $deletedCount = Schedule::where('movie_id', $movie->id)->delete();
-            Log::info('Deleted ' . $deletedCount . ' existing schedules');
-            
-            // Generate new schedules
+            $deletedCount = Schedule::where('movie_id', $movie->id)->delete();// Generate new schedules
             return $this->generateSchedulesForMovie($movie);
             
-        } catch (\Exception $e) {
-            Log::error('Error regenerating schedules for movie ' . $movie->id . ': ' . $e->getMessage());
-            throw $e;
+        } catch (\Exception $e) {throw $e;
         }
     }
 
@@ -264,10 +216,7 @@ class ScheduleGenerationService
      * Generate schedules for all movies
      */
     public function generateSchedulesForAllMovies(): array
-    {
-        Log::info('Generating schedules for all movies');
-        
-        $results = [];
+    {$results = [];
         $movies = Movie::all();
         
         foreach ($movies as $movie) {

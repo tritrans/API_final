@@ -47,6 +47,7 @@ class ReviewController extends Controller
     public function getMovieReviews($movieId)
     {
         $reviews = Review::where('movie_id', $movieId)
+            ->whereNull('parent_review_id') // Only get main reviews, not replies
             ->with(['user', 'replies.user'])
             ->orderBy('created_at', 'desc')
             ->get()
@@ -68,17 +69,15 @@ class ReviewController extends Controller
                             'id' => $reply->id,
                             'user_id' => $reply->user_id,
                             'movie_id' => $reply->movie_id,
-                            'content' => $reply->content,
+                            'user_name' => $reply->user->name ?? 'Người dùng ẩn danh',
+                            'user_email' => $reply->user->email,
+                            'user_avatar_url' => $reply->user->avatar,
+                            'rating' => (float) $reply->rating,
+                            'comment' => $reply->comment,
                             'is_hidden' => $reply->is_hidden ?? false,
-                            'parent_id' => $reply->parent_id,
+                            'parent_review_id' => $reply->parent_review_id,
                             'created_at' => $reply->created_at->toISOString(),
                             'updated_at' => $reply->updated_at->toISOString(),
-                            'user' => [
-                                'id' => $reply->user->id,
-                                'name' => $reply->user->name ?? 'Người dùng ẩn danh',
-                                'email' => $reply->user->email,
-                                'avatar' => $reply->user->avatar,
-                            ]
                         ];
                     })
                 ];
@@ -96,7 +95,8 @@ class ReviewController extends Controller
     public function index($movieId)
     {
         $reviews = Review::where('movie_id', $movieId)
-            ->with('user')
+            ->whereNull('parent_review_id') // Only get main reviews, not replies
+            ->with(['user', 'replies.user'])
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($review) {
@@ -111,6 +111,20 @@ class ReviewController extends Controller
                     'comment' => $review->comment,
                     'is_hidden' => $review->is_hidden ?? false,
                     'created_at' => $review->created_at->toISOString(),
+                    'replies' => $review->replies->map(function ($reply) {
+                        return [
+                            'id' => $reply->id,
+                            'movie_id' => $reply->movie_id,
+                            'user_id' => $reply->user_id,
+                            'user_name' => $reply->user->name ?? 'Người dùng ẩn danh',
+                            'user_email' => $reply->user->email,
+                            'user_avatar_url' => $reply->user->avatar,
+                            'rating' => (float) $reply->rating,
+                            'comment' => $reply->comment,
+                            'is_hidden' => $reply->is_hidden ?? false,
+                            'created_at' => $reply->created_at->toISOString(),
+                        ];
+                    })
                 ];
             });
 
@@ -122,6 +136,11 @@ class ReviewController extends Controller
 
     /**
      * Store a newly created review
+     * Tạo đánh giá mới cho phim
+     * 
+     * @param Request $request - Dữ liệu request chứa rating và comment
+     * @param int $movieId - ID của phim
+     * @return \Illuminate\Http\JsonResponse
      */
     public function store(Request $request, $movieId)
     {
@@ -174,6 +193,7 @@ class ReviewController extends Controller
             'id' => $review->id,
             'movie_id' => $review->movie_id,
             'user_id' => $review->user_id,
+            'user_name' => $review->user->name ?? 'Người dùng ẩn danh',
             'user_email' => $review->user->email,
             'user_avatar_url' => $review->user->avatar,
             'rating' => (float) $review->rating,
@@ -308,7 +328,6 @@ class ReviewController extends Controller
                 ]
             ]);
         } catch (\Exception $e) {
-            \Log::error('Error fetching review: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Error fetching review'
@@ -318,6 +337,11 @@ class ReviewController extends Controller
 
     /**
      * Create a reply to a review
+     * Tạo reply cho đánh giá (thực chất là tạo comment)
+     * 
+     * @param Request $request - Dữ liệu request chứa content
+     * @param int $id - ID của đánh giá gốc
+     * @return \Illuminate\Http\JsonResponse
      */
     public function createReply(Request $request, $id)
     {
@@ -346,30 +370,39 @@ class ReviewController extends Controller
                 ], 400);
             }
             
-            $comment = Comment::create([
+            // Create a review as a reply to the review
+            $replyReview = Review::create([
                 'user_id' => $userId,
                 'movie_id' => $review->movie_id,
-                'content' => $request->content,
-                'parent_id' => $review->id, // Set parent_id to review ID to link it as a reply
-                'is_hidden' => false
+                'rating' => 0.0, // Replies don't have ratings
+                'comment' => $request->content,
+                'is_hidden' => false,
+                'parent_review_id' => $review->id // Link to parent review
             ]);
-
+            
+            // Load user relationship
+            $replyReview->load('user');
+            
             return response()->json([
                 'success' => true,
                 'message' => 'Reply created successfully',
                 'data' => [
-                    'id' => $comment->id,
-                    'content' => $comment->content,
-                    'user_id' => $comment->user_id,
-                    'movie_id' => $comment->movie_id,
-                    'created_at' => $comment->created_at->toISOString()
+                    'id' => $replyReview->id,
+                    'content' => $replyReview->comment,
+                    'user_id' => $replyReview->user_id,
+                    'user_name' => $replyReview->user->name ?? 'Người dùng ẩn danh',
+                    'user_email' => $replyReview->user->email ?? null,
+                    'user_avatar_url' => $replyReview->user->avatar ?? null,
+                    'movie_id' => $replyReview->movie_id,
+                    'rating' => $replyReview->rating,
+                    'parent_review_id' => $replyReview->parent_review_id,
+                    'created_at' => $replyReview->created_at->toISOString()
                 ]
             ]);
         } catch (\Exception $e) {
-            \Log::error('Error creating review reply: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Error creating reply'
+                'message' => 'Error creating reply: ' . $e->getMessage()
             ], 500);
         }
     }

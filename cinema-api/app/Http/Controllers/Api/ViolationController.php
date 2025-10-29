@@ -69,11 +69,21 @@ class ViolationController extends Controller
         $reportable = $reportableClass::find($request->reportable_id);
         
         if (!$reportable) {
-            return $this->errorResponse(ErrorCode::NOT_FOUND, null, 'Reportable entity not found');
+            return $this->errorResponse(ErrorCode::REVIEW_NOT_FOUND, null, 'Reportable entity not found');
+        }
+
+        // Get reporter ID (use authenticated user or default admin)
+        $reporterId = auth()->id();
+        if (!$reporterId) {
+            // If no authenticated user, use admin user as default reporter
+            $adminUser = User::whereHas('roles', function($query) {
+                $query->where('name', 'admin');
+            })->first();
+            $reporterId = $adminUser ? $adminUser->id : 1;
         }
 
         // Check if user already reported this entity
-        $existingReport = ViolationReport::where('reporter_id', auth()->id())
+        $existingReport = ViolationReport::where('reporter_id', $reporterId)
             ->where('reportable_id', $request->reportable_id)
             ->where('reportable_type', $request->reportable_type)
             ->first();
@@ -83,7 +93,7 @@ class ViolationController extends Controller
         }
 
         $report = ViolationReport::create([
-            'reporter_id' => auth()->id(),
+            'reporter_id' => $reporterId,
             'reportable_id' => $request->reportable_id,
             'reportable_type' => $request->reportable_type,
             'violation_type' => $request->violation_type,
@@ -92,6 +102,61 @@ class ViolationController extends Controller
         ]);
 
         return $this->successResponse($report->load(['reporter', 'reportable']), 'Violation report created successfully', 201);
+    }
+
+    /**
+     * Hide content immediately when reported
+     */
+    private function hideContentImmediately($reportableType, $reportableId, $reporterId)
+    {
+        if ($reportableType === 'App\\Models\\Review') {
+            // Hide review and all its replies
+            $review = Review::find($reportableId);
+            if ($review) {
+                $review->is_hidden = true;
+                $review->hidden_reason = 'Vi phạm nội dung (đã báo cáo)';
+                $review->hidden_by = $reporterId;
+                $review->hidden_at = now();
+                $review->save();
+                
+                // Hide all replies to this review
+                Comment::where('parent_id', $reportableId)
+                    ->update([
+                        'is_hidden' => true,
+                        'hidden_reason' => 'Vi phạm nội dung (review gốc bị báo cáo)',
+                        'hidden_by' => $reporterId,
+                        'hidden_at' => now()
+                    ]);
+            }
+        } elseif ($reportableType === 'App\\Models\\Comment') {
+            $comment = Comment::find($reportableId);
+            if ($comment) {
+                if ($comment->parent_id) {
+                    // This is a reply - only hide the reply
+                    $comment->is_hidden = true;
+                    $comment->hidden_reason = 'Vi phạm nội dung (đã báo cáo)';
+                    $comment->hidden_by = $reporterId;
+                    $comment->hidden_at = now();
+                    $comment->save();
+                } else {
+                    // This is a top-level comment - hide comment and all replies
+                    $comment->is_hidden = true;
+                    $comment->hidden_reason = 'Vi phạm nội dung (đã báo cáo)';
+                    $comment->hidden_by = $reporterId;
+                    $comment->hidden_at = now();
+                    $comment->save();
+                    
+                    // Hide all replies to this comment
+                    Comment::where('parent_id', $reportableId)
+                        ->update([
+                            'is_hidden' => true,
+                            'hidden_reason' => 'Vi phạm nội dung (comment gốc bị báo cáo)',
+                            'hidden_by' => $reporterId,
+                            'hidden_at' => now()
+                        ]);
+                }
+            }
+        }
     }
 
     /**
@@ -124,25 +189,14 @@ class ViolationController extends Controller
 
         // If violation is resolved and it's about a comment, hide the comment
         if ($request->status === 'resolved' && $report->reportable_type === 'App\\Models\\Comment') {
-            \Log::info('Attempting to hide comment', [
-                'violation_id' => $report->id,
-                'reportable_type' => $report->reportable_type,
-                'reportable_id' => $report->reportable_id,
-                'status' => $request->status
-            ]);
-            
             $comment = \App\Models\Comment::find($report->reportable_id);
             if ($comment) {
-                \Log::info('Found comment, updating to hidden', ['comment_id' => $comment->id]);
                 $comment->update([
                     'is_hidden' => true,
                     'hidden_reason' => 'Vi phạm nội dung - ' . ($request->resolution_notes ?? 'Không có ghi chú'),
                     'hidden_by' => auth()->id(),
                     'hidden_at' => now()
                 ]);
-                \Log::info('Comment hidden successfully', ['comment_id' => $comment->id]);
-            } else {
-                \Log::warning('Comment not found', ['comment_id' => $report->reportable_id]);
             }
         }
 
@@ -264,30 +318,89 @@ class ViolationController extends Controller
             $reportableType = $violation->reportable_type;
             $reportableId = $violation->reportable_id;
             
+            // Get admin user ID (first admin user)
+            $adminUser = User::whereHas('roles', function($query) {
+                $query->where('name', 'admin');
+            })->first();
+            
+            $adminId = $adminUser ? $adminUser->id : null;
+            
             if ($reportableType === 'App\\Models\\Review') {
+                // Review gốc bị báo cáo - ẩn cả review và tất cả reply
                 $content = Review::find($reportableId);
                 if ($content) {
                     $content->is_hidden = $hide;
                     $content->hidden_reason = $hide ? 'Vi phạm nội dung' : null;
-                    $content->hidden_by = $hide ? 1 : null; // Use admin ID 1 for public route
+                    $content->hidden_by = $hide ? $adminId : null;
                     $content->hidden_at = $hide ? now() : null;
                     $content->save();
+                    
+                    // Ẩn tất cả reply của review này
+                    if ($hide) {
+                        Comment::where('parent_id', $reportableId)
+                            ->update([
+                                'is_hidden' => true,
+                                'hidden_reason' => 'Vi phạm nội dung (review gốc bị ẩn)',
+                                'hidden_by' => $adminId,
+                                'hidden_at' => now()
+                            ]);
+                    } else {
+                        // Hiện lại tất cả reply khi review được hiện
+                        Comment::where('parent_id', $reportableId)
+                            ->update([
+                                'is_hidden' => false,
+                                'hidden_reason' => null,
+                                'hidden_by' => null,
+                                'hidden_at' => null
+                            ]);
+                    }
                 }
             } elseif ($reportableType === 'App\\Models\\Comment') {
                 $content = Comment::find($reportableId);
                 if ($content) {
-                    $content->is_hidden = $hide;
-                    $content->hidden_reason = $hide ? 'Vi phạm nội dung' : null;
-                    $content->hidden_by = $hide ? 1 : null; // Use admin ID 1 for public route
-                    $content->hidden_at = $hide ? now() : null;
-                    $content->save();
+                    // Kiểm tra xem đây có phải reply không
+                    if ($content->parent_id) {
+                        // Đây là reply - chỉ ẩn reply này thôi
+                        $content->is_hidden = $hide;
+                        $content->hidden_reason = $hide ? 'Vi phạm nội dung' : null;
+                        $content->hidden_by = $hide ? $adminId : null;
+                        $content->hidden_at = $hide ? now() : null;
+                        $content->save();
+                    } else {
+                        // Đây là comment gốc - ẩn cả comment và tất cả reply
+                        $content->is_hidden = $hide;
+                        $content->hidden_reason = $hide ? 'Vi phạm nội dung' : null;
+                        $content->hidden_by = $hide ? $adminId : null;
+                        $content->hidden_at = $hide ? now() : null;
+                        $content->save();
+                        
+                        // Ẩn tất cả reply của comment này
+                        if ($hide) {
+                            Comment::where('parent_id', $reportableId)
+                                ->update([
+                                    'is_hidden' => true,
+                                    'hidden_reason' => 'Vi phạm nội dung (comment gốc bị ẩn)',
+                                    'hidden_by' => $adminId,
+                                    'hidden_at' => now()
+                                ]);
+                        } else {
+                            // Hiện lại tất cả reply khi comment được hiện
+                            Comment::where('parent_id', $reportableId)
+                                ->update([
+                                    'is_hidden' => false,
+                                    'hidden_reason' => null,
+                                    'hidden_by' => null,
+                                    'hidden_at' => null
+                                ]);
+                        }
+                    }
                 }
             }
             
             // Update violation status
             $violation->status = $hide ? 'resolved' : 'pending';
             $violation->resolved_at = $hide ? now() : null;
-            $violation->handled_by = $hide ? 1 : null; // Use admin ID 1 for public route
+            $violation->handled_by = $hide ? $adminId : null;
             $violation->save();
             
             return $this->successResponse([
@@ -299,7 +412,6 @@ class ViolationController extends Controller
             ], $hide ? 'Nội dung đã được ẩn' : 'Nội dung đã được hiện');
             
         } catch (\Exception $e) {
-            \Log::error('Toggle visibility error: ' . $e->getMessage());
             return $this->errorResponse(ErrorCode::INTERNAL_ERROR, null, 'Lỗi khi cập nhật trạng thái: ' . $e->getMessage());
         }
     }

@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\ScheduleSeatController;
 use App\Http\Controllers\Api\MovieCastController;
 use App\Http\Controllers\Api\ViolationController;
+use App\Services\GoogleDriveService;
 
 /*
 |--------------------------------------------------------------------------
@@ -35,6 +36,11 @@ Route::post('/auth/send-otp', [AuthController::class, 'sendOtp']);
 Route::post('/auth/verify-otp', [AuthController::class, 'verifyOtp']);
 Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
+
+// Admin user management routes
+Route::middleware(['auth:api'])->group(function () {
+    Route::post('/users/{userId}/toggle-status', [AuthController::class, 'toggleUserStatus']);
+});
 
 Route::post('/auth/change-password', [AuthController::class, 'changePassword'])->middleware('auth:api');
 
@@ -65,10 +71,10 @@ Route::get('/schedules/movie/{movieId}/flutter', [ScheduleController::class, 'mo
 Route::get('/schedules/movie/{movieId}/dates', [ScheduleController::class, 'availableDates']);
 Route::get('/schedules/movie/{movieId}/dates/flutter', [ScheduleController::class, 'movieAvailableDatesFlutter']);
 Route::get('/schedules/date', [ScheduleController::class, 'dateSchedules']);
-Route::post('/schedules', [ScheduleController::class, 'store']);
+Route::post('/schedules', [ScheduleController::class, 'store'])->middleware('auth:api');
 Route::get('/schedules/{id}', [ScheduleController::class, 'show']);
-Route::put('/schedules/{id}', [ScheduleController::class, 'update']);
-Route::delete('/schedules/{id}', [ScheduleController::class, 'destroy']);
+Route::put('/schedules/{id}', [ScheduleController::class, 'update'])->middleware('auth:api');
+Route::delete('/schedules/{id}', [ScheduleController::class, 'destroy'])->middleware('auth:api');
 // Seats per schedule
 Route::get('/schedules/{scheduleId}/seats', [ScheduleSeatController::class, 'index']);
 // Removed hold seats route to prevent race conditions
@@ -148,14 +154,6 @@ Route::middleware(['auth:api'])->group(function () {
 
 Route::get('/users/{id}/reviews', [UserController::class, 'getUserReviews']);
 
-// Test endpoint for debugging
-Route::get('/test-comments', function() {
-    return response()->json([
-        'success' => true,
-        'message' => 'Comments endpoint is working',
-        'data' => []
-    ]);
-});
 
 // Public endpoints for all reviews and comments (no auth required)
 Route::get('/reviews/public', [ReviewController::class, 'getAllReviews']);
@@ -304,26 +302,6 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/upload/test-auth', [FileUploadController::class, 'testGoogleDriveAuth']);
     Route::middleware(['auth:api'])->post('/upload/file', [FileUploadController::class, 'uploadFile']);
     
-    // Debug route to check current user
-    Route::middleware('auth:api')->get('/debug/current-user', function() {
-        $user = auth()->user();
-        if ($user) {
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'id' => $user->id,
-                    'email' => $user->email,
-                    'role' => $user->role,
-                    'name' => $user->name
-                ]
-            ]);
-        } else {
-            return response()->json([
-                'success' => false,
-                'message' => 'No authenticated user'
-            ]);
-        }
-    });
     Route::post('/upload/file-local', [FileUploadController::class, 'uploadFileLocal']);
     Route::post('/upload/files', [FileUploadController::class, 'uploadMultipleFiles']);
     Route::delete('/upload/file', [FileUploadController::class, 'deleteFile']);
@@ -338,68 +316,6 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/bookings/{bookingId}/cancel', [BookingController::class, 'cancelBooking']);
     Route::get('/snacks', [BookingController::class, 'getSnacks']);
 
-// Test endpoint for debugging
-Route::get('/test-auth', function() {
-    return response()->json([
-        'success' => true,
-        'message' => 'API is working',
-        'timestamp' => now(),
-    ]);
-});
-
-// Test database endpoint
-Route::get('/test-db', function() {
-    $userCount = \App\Models\User::count();
-    $movieCount = \App\Models\Movie::count();
-    $reviewCount = \App\Models\Review::count();
-    
-    $users = \App\Models\User::select('id', 'name', 'email')->get();
-    $movies = \App\Models\Movie::select('id', 'title')->get();
-    
-    return response()->json([
-        'success' => true,
-        'data' => [
-            'user_count' => $userCount,
-            'movie_count' => $movieCount,
-            'review_count' => $reviewCount,
-            'users' => $users,
-            'movies' => $movies,
-        ]
-    ]);
-});
-
-// Test Google Drive endpoint
-Route::get('/test-google-drive', function() {
-    try {
-        $service = new \App\Services\GoogleDriveService();
-        $authResult = $service->testAuth();
-        
-        // Test thumbnail URL
-        $testFileId = "1riZU9q6L6ndPIRFYC4Tta0erWhDAdJTo";
-        $thumbnailUrl = $service->getThumbnailUrl($testFileId);
-        
-        return response()->json([
-            'success' => true,
-            'auth_result' => $authResult,
-            'test_thumbnail_url' => $thumbnailUrl,
-            'config' => [
-                'client_id' => config('services.google.client_id') ? 'SET' : 'NOT_SET',
-                'client_secret' => config('services.google.client_secret') ? 'SET' : 'NOT_SET',
-                'refresh_token' => config('services.google.refresh_token') ? 'SET' : 'NOT_SET',
-                'folder_id' => config('services.google.folder_id') ?: 'NOT_SET',
-            ]
-        ]);
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ]);
-    }
-});
-
-// Test upload endpoint (no auth required for testing)
-Route::post('/test-upload', [FileUploadController::class, 'testUploadFile']);
 
 // Image proxy endpoint to avoid CORS issues
 Route::get('/image-proxy', function(\Illuminate\Http\Request $request) {
@@ -479,4 +395,19 @@ Route::get('/image-proxy', function(\Illuminate\Http\Request $request) {
         Route::post('/movies/with-files', [MovieController::class, 'storeWithFiles']);
         Route::put('/movies/{id}', [MovieController::class, 'update']);
         Route::delete('/movies/{id}', [MovieController::class, 'destroy']);
+    });
+
+    // Test Google Drive configuration
+    Route::get('/test/google-drive/config', function (GoogleDriveService $googleDrive) {
+        return response()->json([
+            'success' => true,
+            'config' => $googleDrive->testConfig()
+        ]);
+    });
+
+    Route::get('/test/google-drive/auth', function (GoogleDriveService $googleDrive) {
+        return response()->json([
+            'success' => true,
+            'auth' => $googleDrive->testAuth()
+        ]);
     });

@@ -357,15 +357,12 @@ class ScheduleController extends Controller
                 'start_time' => $startTime,
                 'end_time' => $endTime,
                 'price' => $request->price,
-                'status' => $request->status ?? 'active',
-                'available_seats' => json_encode([])
+                'status' => $request->status ?? 'active'
             ]);
 
             return $this->successResponse($schedule, 'Schedule created successfully');
 
-        } catch (\Exception $e) {
-            \Log::error('Schedule creation error: ' . $e->getMessage());
-            return $this->errorResponse(ErrorCode::INTERNAL_ERROR, null, 'Failed to create schedule');
+        } catch (\Exception $e) {return $this->errorResponse(ErrorCode::INTERNAL_ERROR, null, 'Failed to create schedule');
         }
     }
 
@@ -426,9 +423,7 @@ class ScheduleController extends Controller
 
             return $this->successResponse($schedule, 'Schedule updated successfully');
 
-        } catch (\Exception $e) {
-            \Log::error('Schedule update error: ' . $e->getMessage());
-            return $this->errorResponse(ErrorCode::INTERNAL_ERROR, null, 'Failed to update schedule');
+        } catch (\Exception $e) {return $this->errorResponse(ErrorCode::INTERNAL_ERROR, null, 'Failed to update schedule');
         }
     }
 
@@ -460,9 +455,7 @@ class ScheduleController extends Controller
 
             return $this->successResponse(null, 'Schedule deleted successfully');
 
-        } catch (\Exception $e) {
-            \Log::error('Schedule deletion error: ' . $e->getMessage());
-            return $this->errorResponse(ErrorCode::INTERNAL_ERROR, null, 'Failed to delete schedule');
+        } catch (\Exception $e) {return $this->errorResponse(ErrorCode::INTERNAL_ERROR, null, 'Failed to delete schedule');
         }
     }
 }

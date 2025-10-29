@@ -104,8 +104,8 @@ class FileUploadController extends Controller
             $file = $request->file('file');
             $type = $request->input('type');
             
-        // For avatar, use local storage
-        if ($type === 'avatar') {
+            // For avatar, use local storage
+            if ($type === 'avatar') {
             $filename = time() . '_' . $file->getClientOriginalName();
             $path = $file->storeAs('uploads/avatars', $filename, 'public');
             $url = asset('storage/' . $path);
